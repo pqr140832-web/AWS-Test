@@ -1,16 +1,4 @@
-import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
-
-// 从环境变量读取 Bedrock API key
-const client = new BedrockRuntimeClient({
-  region: "us-east-1",
-  credentials: {
-    accessKeyId: process.env.BEDROCK_API_KEY,
-    secretAccessKey: process.env.BEDROCK_API_KEY
-  }
-});
-
 export default async function handler(req, res) {
-  // 设置 CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -25,32 +13,44 @@ export default async function handler(req, res) {
 
   try {
     const { message } = req.body;
-
-    const command = new InvokeModelCommand({
-      modelId: "global.anthropic.claude-haiku-4-5-20251001-v1:0",
-      body: JSON.stringify({
-        anthropic_version: "bedrock-2023-05-31",
-        max_tokens: 2048,
-        messages: [
-          {
-            role: "user",
-            content: message
-          }
-        ]
-      })
-    });
-
-    const response = await client.send(command);
-    const result = JSON.parse(new TextDecoder().decode(response.body));
     
-    res.status(200).json({ 
-      response: result.content[0].text 
-    });
+    // 直接使用 HTTPS 请求调用 Bedrock API
+    const response = await fetch(
+      'https://bedrock-runtime.us-east-1.amazonaws.com/model/global.anthropic.claude-haiku-4-5-20251001-v1:0/converse',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.BEDROCK_API_KEY}`  // 直接用 Bearer token
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'user',
+              content: [{ text: message }]
+            }
+          ]
+        })
+      }
+    );
+
+    const data = await response.json();
+    
+    // 检查是否有错误
+    if (!response.ok) {
+      console.error('Bedrock API Error:', data);
+      return res.status(500).json({ 
+        error: `API 错误: ${data.message || JSON.stringify(data)}` 
+      });
+    }
+    
+    // 提取回复文本
+    const text = data.output?.message?.content?.[0]?.text || '无回复';
+    
+    res.status(200).json({ response: text });
 
   } catch (error) {
     console.error('Error:', error);
-    res.status(500).json({ 
-      error: error.message 
-    });
+    res.status(500).json({ error: error.message });
   }
 }
