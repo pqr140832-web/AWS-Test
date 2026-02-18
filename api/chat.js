@@ -25,15 +25,15 @@ export default async function handler(req, res) {
     );
 
     const data = await response.json();
+    console.log('Status:', response.status);
+    console.log('Response:', JSON.stringify(data));
 
     if (!response.ok) {
-      console.error('Bedrock Error:', JSON.stringify(data));
       return res.status(response.status).json({ error: data.message || JSON.stringify(data) });
     }
 
     const text = data.output?.message?.content?.[0]?.text;
     if (!text) {
-      console.error('No text:', JSON.stringify(data));
       return res.status(500).json({ error: '未收到回复' });
     }
     return res.status(200).json({ response: text });
