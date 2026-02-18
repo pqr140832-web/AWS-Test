@@ -11,18 +11,15 @@ export default async function handler(req, res) {
     if (!message?.trim()) return res.status(400).json({ error: '消息不能为空' });
 
     const response = await fetch(
-      'https://bedrock.us-east-1.amazonaws.com/v1/messages',
+      'https://bedrock-runtime.us-east-1.amazonaws.com/model/us.anthropic.claude-haiku-4-5-20251001-v1:0/converse',
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': process.env.BEDROCK_API_KEY,
-          'anthropic-version': '2023-06-01'
+          'Authorization': `Bearer ${process.env.BEDROCK_API_KEY}`
         },
         body: JSON.stringify({
-          model: 'anthropic.claude-haiku-4-5-20251001-v1:0',
-          max_tokens: 1024,
-          messages: [{ role: 'user', content: message }]
+          messages: [{ role: 'user', content: [{ text: message }] }]
         })
       }
     );
@@ -30,12 +27,15 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Bedrock Error:', data);
+      console.error('Bedrock Error:', JSON.stringify(data));
       return res.status(response.status).json({ error: data.message || JSON.stringify(data) });
     }
 
-    const text = data.content?.[0]?.text;
-    if (!text) return res.status(500).json({ error: '未收到回复' });
+    const text = data.output?.message?.content?.[0]?.text;
+    if (!text) {
+      console.error('No text:', JSON.stringify(data));
+      return res.status(500).json({ error: '未收到回复' });
+    }
     return res.status(200).json({ response: text });
 
   } catch (error) {
